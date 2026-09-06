@@ -61,6 +61,16 @@ md("""
 I started with a dataset of daily London weather.
 Every row is one day, and each day has readings (cols), like temperature, cloud cover,
 sunshine, pressure, rainfall, etc.
+
+Each row records what the weather was on each day, including:
+
+* Temperature - The minimum (min_temp), maximum (max_temp), and average temperature (mean_temp)
+* Cloud Cover - How cloudy the sky was, measured in Oktas (0 being totally clear, 8 being full overcast, 4 being 50% cover. one exception is 9 being to foggy to see the clouds)
+* Sunshine - How many hours the sun was clear in the sky
+* Global Radiation - How much energy is coming down to Earth (Watts per square metre)
+* Precipitation - How much rain fell in milimetres
+* Pressure - This is in pascals (101,325Pa is "normal" sea level pressure)
+* Snow Depth - How much snow was in the ground in centimetres
       """)
 
 cd("""
@@ -76,6 +86,8 @@ col1, col2 = st.columns(2)
 col1.metric("Total days of weather", len(df))
 col2.metric("Columns in the dataset", df.shape[1])
 st.dataframe(df.head())
+
+
 st.divider()
 
 # ––––––––––––––– CHAPTER 2: Cleaning –––––––––––––––
@@ -106,40 +118,66 @@ Before building any models, we need to look at the data and find patterns.
 Here are the most interesting things we discovered.
 """)
 
-fig1 = px.scatter(df, x="date", y="mean_temp",
-                  trendline="ols", opacity=0.2, trendline_color_override="black",
-                  title="Mean Temperature in London (1979-2021)",
-                  labels={"mean_temp": "Mean Temperature (°C)", "date": "Date"})
+fig1 = px.scatter(
+    df,
+    x="date",
+    y="mean_temp",
+    trendline="ols",
+    opacity=0.2,
+    trendline_color_override="black",
+    title="Mean Temperature in London (1979-2021)",
+    labels={"mean_temp": "Mean Temperature (°C)", "date": "Date"},
+)
 
 with st.status("#### Temperature over time"):
     st.plotly_chart(fig1, use_container_width=True)
-    md("London is slowly getting warmer, the trend line shows climate change in action.")
+    md(
+        "London is slowly getting warmer, the trend line shows climate change in action."
+    )
 
 
-
-fig2 = px.scatter(df, x="day", y="mean_temp", color="season",
-                  opacity=0.4, animation_frame="year",
-                  title="Mean Daily Temperature by Year",
-                  labels={"mean_temp": "Mean Temperature (°C)", "day": "Day of Year"})
+fig2 = px.scatter(
+    df,
+    x="day",
+    y="mean_temp",
+    color="season",
+    opacity=0.4,
+    animation_frame="year",
+    title="Mean Daily Temperature by Year",
+    labels={"mean_temp": "Mean Temperature (°C)", "day": "Day of Year"},
+)
 with st.status("#### Daily temperatures, year by year"):
     st.plotly_chart(fig2, use_container_width=True)
 
 
-
-fig3 = px.line(df, x="day", y="precipitation", animation_frame="year",
-               title="Daily Precipitation Curve by Year",
-               labels={"precipitation": "Rainfall (mm)", "day": "Day of Year"})
+fig3 = px.line(
+    df,
+    x="day",
+    y="precipitation",
+    animation_frame="year",
+    title="Daily Precipitation Curve by Year",
+    labels={"precipitation": "Rainfall (mm)", "day": "Day of Year"},
+)
 
 with st.status("#### Precipitation"):
     st.plotly_chart(fig3, use_container_width=True)
     md("Rainfall is unpredictable throughout the year, no clear seasonal pattern.")
 
 
-
-fig4 = px.scatter_3d(df, x="day", y="precipitation", z="snow_depth",
-                     color="season", opacity=0.6,
-                     title="Daily Rainfall & Snow Depth (all years, 3D)",
-                     labels={"day": "Day of Year", "precipitation": "Rainfall (mm)", "snow_depth": "Snow Depth (mm)"})
+fig4 = px.scatter_3d(
+    df,
+    x="day",
+    y="precipitation",
+    z="snow_depth",
+    color="season",
+    opacity=0.6,
+    title="Daily Rainfall & Snow Depth (all years, 3D)",
+    labels={
+        "day": "Day of Year",
+        "precipitation": "Rainfall (mm)",
+        "snow_depth": "Snow Depth (mm)",
+    },
+)
 fig4.update_traces(marker=dict(size=2))
 fig4.update_layout(height=700, scene_camera=dict(eye=dict(x=2, y=2, z=1.5)))
 
@@ -191,16 +229,41 @@ md("""
 We first trained a Decision Tree just to rank which features matter most. `max temp` dominated - today's maximum tamperature is by far the strongest signal.
 """)
 
-imp_df = pd.DataFrame({
-    "Feature":    ["max_temp", "mean_temp", "cloud_cover", "min_temp",
-                   "global_radiation", "sunshine", "temp_last5",
-                   "year", "pressure", "temp_yesterday"],
-    "Importance": [0.931, 0.028, 0.004, 0.003,
-                   0.003, 0.003, 0.002,
-                   0.002, 0.002, 0.002],
-})
-fig_imp = px.bar(imp_df, x="Feature", y="Importance",
-                 title="Feature Importance (Decision Tree)", log_y=True)
+imp_df = pd.DataFrame(
+    {
+        "Feature": [
+            "max_temp",
+            "mean_temp",
+            "cloud_cover",
+            "min_temp",
+            "global_radiation",
+            "sunshine",
+            "temp_last5",
+            "year",
+            "pressure",
+            "temp_yesterday",
+        ],
+        "Importance": [
+            0.931,
+            0.028,
+            0.004,
+            0.003,
+            0.003,
+            0.003,
+            0.002,
+            0.002,
+            0.002,
+            0.002,
+        ],
+    }
+)
+fig_imp = px.bar(
+    imp_df,
+    x="Feature",
+    y="Importance",
+    title="Feature Importance (Decision Tree)",
+    log_y=True,
+)
 st.plotly_chart(fig_imp, use_container_width=True)
 md("#### Training")
 cd("""
@@ -216,28 +279,47 @@ model = LinearRegression()
 model.fit(X_train, y_train)
 """)
 col1, col2, col3 = st.columns(3)
-col1.metric("MAE",  "0.85 °C", help="Average prediction error")
+col1.metric("MAE", "0.85 °C", help="Average prediction error")
 col2.metric("RMSE", "1.10 °C", help="Typical error size")
-col3.metric("R²",   "0.961",   help="96% of variation explained")
-md("On average the model is off by less than 1 °C - and it explains 96% of the variation.")
+col3.metric("R²", "0.961", help="96% of variation explained")
+md(
+    "On average the model is off by less than 1 °C - and it explains 96% of the variation."
+)
 
 md("### Actual vs Predicted")
 md("""
 A perfect model would put every dot on the diogonal line. The closer the dots cluster to it the better the model.
    """)
 
-features_single = ["max_temp", "mean_temp", "cloud_cover", "min_temp", "temp_last5", "year", "pressure"]
+features_single = [
+    "max_temp",
+    "mean_temp",
+    "cloud_cover",
+    "min_temp",
+    "temp_last5",
+    "year",
+    "pressure",
+]
 X = features_df[features_single]
 y = features_df["temp_tomorrow"]
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 model_single = LinearRegression()
 model_single.fit(X_train, y_train)
 y_pred = model_single.predict(X_test)
 
-eval_df = pd.DataFrame({"Actual": y_test.values, "Predicted": y_pred}).sample(1000, random_state=1)
-fig_eval = px.scatter(eval_df, x="Actual", y="Predicted",
-                      trendline="ols", opacity=0.5,
-                      title="Actual vs Predicted Temperature (°C)")
+eval_df = pd.DataFrame({"Actual": y_test.values, "Predicted": y_pred}).sample(
+    1000, random_state=1
+)
+fig_eval = px.scatter(
+    eval_df,
+    x="Actual",
+    y="Predicted",
+    trendline="ols",
+    opacity=0.5,
+    title="Actual vs Predicted Temperature (°C)",
+)
 st.plotly_chart(fig_eval, use_container_width=True)
 md("Most dots sit very close to the line — the model works!")
 
@@ -252,7 +334,9 @@ with open("models/temperature_features.pkl", "wb") as f:
     pickle.dump(features, f)
 """)
 
-md("We save the trained model to a file so the Streamlit app can load it instantly without retraining")
+md(
+    "We save the trained model to a file so the Streamlit app can load it instantly without retraining"
+)
 st.divider()
 
 # ––––––––––––––– CHAPTER 6: Model 2: Multi-Output Regression –––––––––––––––
@@ -281,20 +365,30 @@ We ran the decision tree again, this time to meassure the importance of the feat
 `max_temp` still leads, but the season also matters more with `season_summer` being in the lead, as during summer there are less fluctuations due to reduced precipitation.
 """)
 
-df_m = features_df.drop(columns=["date", "tomorrow_rain", "temp_tomorrow", "day", "month"])
+df_m = features_df.drop(
+    columns=["date", "tomorrow_rain", "temp_tomorrow", "day", "month"]
+)
 df_m = df_m.copy()
 df_m["temp_day5"] = df_m["mean_temp"].shift(-5)
 df_m = df_m.dropna()
 X_m = df_m.drop(columns=["temp_day5"])
 y_m = df_m["temp_day5"]
-X_train_m, X_test_m, y_train_m, y_test_m = train_test_split(X_m, y_m, test_size=0.2, random_state=42)
+X_train_m, X_test_m, y_train_m, y_test_m = train_test_split(
+    X_m, y_m, test_size=0.2, random_state=42
+)
 tree_m = DecisionTreeRegressor(random_state=42)
 tree_m.fit(X_train_m, y_train_m)
-imp_m = pd.Series(tree_m.feature_importances_, index=X_m.columns).sort_values(ascending=False)
+imp_m = pd.Series(tree_m.feature_importances_, index=X_m.columns).sort_values(
+    ascending=False
+)
 imp_m_df = imp_m.reset_index()
 imp_m_df.columns = ["Feature", "Importance"]
-fig_imp_m = px.bar(imp_m_df.head(10), x="Feature", y="Importance",
-                   title="Top 10 Feature Importances for Day 5 (Decision Tree)")
+fig_imp_m = px.bar(
+    imp_m_df.head(10),
+    x="Feature",
+    y="Importance",
+    title="Top 10 Feature Importances for Day 5 (Decision Tree)",
+)
 st.plotly_chart(fig_imp_m, use_container_width=True)
 
 md("#### Training")
@@ -314,13 +408,20 @@ y_pred = model.predict(X_test)
 """)
 
 md("#### How accurate is the 5-day forecast?")
-results_df = pd.DataFrame({
-    "Day": ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5"],
-    "MAE": [1.073,   1.495,   1.912,   2.169,   2.311],
-    "R²":  [0.944,   0.883,   0.818,   0.769,   0.735],
-})
-fig_acc = px.line(results_df, x="Day", y=["MAE", "R²"], markers=True,
-                  title="Multi-Output Model: Accuracy by Forecast Day")
+results_df = pd.DataFrame(
+    {
+        "Day": ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5"],
+        "MAE": [1.073, 1.495, 1.912, 2.169, 2.311],
+        "R²": [0.944, 0.883, 0.818, 0.769, 0.735],
+    }
+)
+fig_acc = px.line(
+    results_df,
+    x="Day",
+    y=["MAE", "R²"],
+    markers=True,
+    title="Multi-Output Model: Accuracy by Forecast Day",
+)
 st.plotly_chart(fig_acc, use_container_width=True)
 
 md("""
@@ -365,5 +466,3 @@ with col2:
 Forecasts the **next 5 days**
 of temperatures.
 """)
-    
-#aisudygasd
